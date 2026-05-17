@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>वेतन देयक पत्रक टूल</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --blue:#1a3a5c; --blue2:#2563a8; --accent:#e67e22;
+  --bg:#f0f4fa; --border:#b8c9e0; --text:#1a2233; --muted:#6b7a99; --green:#1a7a4a;
+}
+body { font-family:'Noto Sans Devanagari',Arial,sans-serif; background:var(--bg); color:var(--text); }
+
+/* ── APP CHROME ── */
+.topbar { background:var(--blue); color:white; padding:11px 14px; display:flex; align-items:center; gap:10px; }
+.topbar h1 { font-size:15px; font-weight:700; line-height:1.3; }
+.topbar small { font-size:10.5px; opacity:0.78; display:block; }
+
+.tabs { display:flex; background:var(--blue); border-top:1px solid rgba(255,255,255,0.13); }
+.tab-btn { flex:1; padding:11px 4px; background:transparent; border:none; color:rgba(255,255,255,0.6); font-family:inherit; font-size:12px; font-weight:700; cursor:pointer; border-bottom:3px solid transparent; }
+.tab-btn.active { color:white; border-bottom:3px solid var(--accent); }
+
+.panel { display:none; padding:13px; }
+.panel.active { display:block; }
+
+/* ── FORM ── */
+.sec { font-size:11.5px; font-weight:700; color:var(--blue2); letter-spacing:.05em; text-transform:uppercase; border-bottom:1px solid var(--border); padding-bottom:4px; margin:13px 0 8px; }
+.sec:first-child { margin-top:0; }
+.fr { margin-bottom:9px; }
+.fr label { font-size:11.5px; font-weight:600; color:var(--muted); display:block; margin-bottom:3px; }
+.fr input, .fr select { width:100%; border:1.5px solid var(--border); border-radius:7px; padding:9px 11px; font-size:13.5px; font-family:inherit; color:var(--text); background:#f8faff; }
+.fr input:focus, .fr select:focus { outline:none; border-color:var(--blue2); background:white; }
+.fr input[type=number] { text-align:right; }
+.g2 { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+
+.rate-box { background:#eaf3ff; border:1.5px solid #b3d0f0; border-radius:9px; padding:11px 13px; font-size:13px; line-height:2.2; }
+.rate-box b { color:var(--blue2); }
+.rate-box input { width:66px; padding:3px 7px; font-size:13px; font-family:inherit; border:1.5px solid #b3d0f0; border-radius:5px; background:white; text-align:right; display:inline-block; }
+
+/* ── STAFF CARDS ── */
+.sc { background:white; border:1.5px solid var(--border); border-radius:9px; margin-bottom:11px; overflow:hidden; }
+.sc-h { background:var(--blue); color:white; padding:9px 13px; display:flex; justify-content:space-between; align-items:center; font-size:13.5px; font-weight:700; }
+.sc-h button { background:rgba(255,255,255,0.18); border:none; color:white; border-radius:5px; cursor:pointer; font-size:12px; padding:3px 9px; font-family:inherit; }
+.sc-b { padding:11px 13px; }
+.preview { background:#f0fff4; border:1px solid #b2dfdb; border-radius:7px; padding:7px 11px; font-size:12px; line-height:1.9; margin-top:7px; color:var(--green); }
+.preview b { font-size:13px; }
+
+/* ── BUTTONS ── */
+.btn { display:block; width:100%; padding:12px; border:none; border-radius:9px; font-family:inherit; font-size:14.5px; font-weight:700; cursor:pointer; text-align:center; margin-bottom:9px; }
+.b-add { background:var(--blue2); color:white; }
+.b-gen { background:var(--green); color:white; }
+.b-pdf { background:var(--accent); color:white; }
+.b-prn { background:#555; color:white; }
+
+/* ── SUMMARY ── */
+.sg { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-bottom:12px; }
+.sc2 { background:var(--blue); color:white; border-radius:9px; padding:9px 11px; text-align:center; }
+.sc2 .v { font-size:15px; font-weight:700; }
+.sc2 .l { font-size:10px; opacity:.8; margin-top:1px; }
+.sc2.hl { background:var(--green); }
+
+/* ══════════════════════════════════════
+   PRINT AREA — matches original PDF exactly
+   ══════════════════════════════════════ */
+#printArea {
+  background:white;
+  border-radius:9px;
+  padding:16px;
+  box-shadow:0 2px 10px rgba(0,0,0,.1);
+  overflow-x:auto;
+}
+
+/* Title block — no border, just text centered */
+.pa-title {
+  text-align:center;
+  margin-bottom:14px;
+  padding-bottom:10px;
+  border-bottom: 1px solid #ccc;
+}
+.pa-title .t1 { font-size:21px; font-weight:700; line-height:1.5; color:#000; }
+.pa-title .t2 { font-size:14.5px; font-weight:400; color:#222; margin-top:3px; }
+
+/* TABLE — exact match to original */
+.salary-wrap { overflow-x:auto; }
+table.st {
+  width:100%;
+  border-collapse:collapse;
+  font-size:14px;
+  color:#000;
+}
+table.st thead th {
+  border:1px solid #555;
+  padding:6px 5px;
+  text-align:center;
+  font-size:13.5px;
+  font-weight:700;
+  vertical-align:middle;
+  line-height:1.45;
+  background:#fff;
+  color:#000;
+}
+table.st tbody td {
+  border:1px solid #888;
+  padding:6px 5px;
+  text-align:center;
+  font-size:15px;
+  vertical-align:middle;
+  background:#fff;
+  color:#000;
+}
+table.st td.nc {
+  text-align:left;
+  padding-left:8px;
+  line-height:1.65;
+  white-space:normal;
+}
+.code { font-size:12px; color:#666; display:block; }
+
+/* subtotal rows */
+table.st tr.sub td {
+  font-weight:700;
+  background:#f7f7f7 !important;
+  border-color:#555;
+}
+/* grand total */
+table.st tr.gtot td {
+  font-weight:700;
+  background:#f0f0f0 !important;
+  border-color:#333;
+  border-top:2px solid #333;
+}
+
+/* Signature */
+.sig-wrap { margin-top:35px; text-align:right; padding-right:30px; }
+.sig { display:inline-block; text-align:center; }
+.sig .sig-title { font-size:13px; font-weight:700; text-decoration:underline; display:block; margin-bottom:6px; }
+.sig .sig-sub { font-size:11.5px; display:block; margin-top:3px; }
+
+.empty-msg { text-align:center; padding:28px 16px; color:var(--muted); font-size:13.5px; line-height:1.8; }
+
+/* ── PRINT MEDIA ── */
+@media print {
+  body { background:white; }
+  .topbar,.tabs,.panel:not(#panel-preview),#pa-actions,.sg { display:none !important; }
+  #panel-preview { display:block !important; padding:0; }
+  #printArea { box-shadow:none; border-radius:0; padding:4mm 6mm; overflow:visible; }
+  @page { size:A4 landscape; margin:10mm 12mm; }
+  table.st { font-size:15px; }
+  table.st thead th { font-size:13.5px; padding:6px 4px; }
+  table.st tbody td { font-size:15px; padding:7px 4px; }
+  .pa-title .t1 { font-size:18px; }
+  .pa-title .t2 { font-size:12.5px; }
+  .sig { margin-top:10px; }
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>📋</div>
+  <div>
+    <h1>वेतन देयक पत्रक टूल</h1>
+    <small>शा.हाईस्कूल मोढ़े – स्वचालित गणना प्रणाली</small>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="ST('s')">⚙️ सेटिंग</button>
+  <button class="tab-btn" onclick="ST('k')">👥 कर्मचारी</button>
+  <button class="tab-btn" onclick="ST('p');GT()">📄 पत्रक</button>
+</div>
+
+<!-- ═══ SETTINGS ═══ -->
+<div class="panel active" id="panel-s">
+  <div class="sec">📅 माह और सत्र</div>
+  <div class="fr"><label>माह</label>
+    <select id="selMonth">
+      <option>जनवरी</option><option>फरवरी</option><option>मार्च</option>
+      <option>अप्रैल</option><option selected>मई</option><option>जून</option>
+      <option>जुलाई</option><option>अगस्त</option><option>सितंबर</option>
+      <option>अक्टूबर</option><option>नवंबर</option><option>दिसंबर</option>
+    </select>
+  </div>
+  <div class="fr"><label>सत्र (वर्ष)</label>
+    <input type="text" id="selYear" value="2026-27">
+  </div>
+
+  <div class="sec">💰 भत्ता दरें</div>
+  <div class="rate-box">
+    <b>महंगाई भत्ता:</b> <input type="number" id="daRate" value="58" min="0" max="200"> %<br>
+    <b>मकान भाड़ा &nbsp;:</b> <input type="number" id="hraRate" value="7" min="0" max="50"> %<br>
+    <span style="font-size:11px;color:#666;">% बदलने पर सब auto update होगा।</span>
+  </div>
+
+  <div class="sec" style="margin-top:14px;">📖 उपयोग विधि</div>
+  <div style="background:#fffbea;border:1.5px solid #f9c74f;border-radius:9px;padding:11px 13px;font-size:13px;line-height:2;">
+    1️⃣ <b>सेटिंग</b> — माह, सत्र, DA%, HRA% सेट करें<br>
+    2️⃣ <b>कर्मचारी</b> — मूल वेतन, GPF, GIS, IT भरें<br>
+    3️⃣ <b>पत्रक</b> tab पर जाएं — PDF/Print करें
+  </div>
+  <button class="btn b-add" style="margin-top:13px;" onclick="ST('k')">👥 कर्मचारी देखें / भरें →</button>
+</div>
+
+<!-- ═══ STAFF ═══ -->
+<div class="panel" id="panel-k">
+  <div id="staffList"></div>
+  <button class="btn b-add" onclick="AS()">+ नया कर्मचारी जोड़ें</button>
+  <button class="btn b-gen" onclick="ST('p');GT()">📄 पत्रक तैयार करें →</button>
+</div>
+
+<!-- ═══ PREVIEW ═══ -->
+<div class="panel" id="panel-p">
+  <div id="pa-actions">
+    <button class="btn b-gen" onclick="GT()">🔄 Refresh / Update करें</button>
+    <button class="btn b-pdf" onclick="DL()">⬇ PDF डाउनलोड करें</button>
+    <button class="btn b-prn" onclick="window.print()">🖨️ Print करें</button>
+  </div>
+  <div class="sg" id="sumGrid" style="display:none;"></div>
+
+  <div id="printArea">
+    <div class="empty-msg" id="emptyMsg">👈 पहले <b>कर्मचारी</b> tab में जानकारी भरें।</div>
+    <div id="tableArea" style="display:none;">
+
+      <!-- TITLE — matches original exactly -->
+      <div class="pa-title">
+        <div class="t1">वेतन देयक पत्रक &nbsp;&nbsp; माह : <span id="oMonth"></span> &nbsp; सत्र <span id="oYear"></span></div>
+        <div class="t2">शासकीय हाईस्कूल मोढ़े, विकासखंड-तखतपुर, जिला–बिलासपुर (छ. ग.)</div>
+      </div>
+
+      <!-- TABLE -->
+      <div class="salary-wrap">
+      <table class="st">
+        <thead>
+          <tr>
+            <th rowspan="2" style="width:26px;">क्र.</th>
+            <th rowspan="2" style="text-align:left;padding-left:8px;min-width:115px;">कर्मचारी का नाम<br><span style="font-weight:400;font-size:10px;">(Treasury Code)</span></th>
+            <th rowspan="2" style="width:70px;">पदनाम</th>
+            <th rowspan="2" style="width:68px;">वेतन वृद्धि<br>की तिथि</th>
+            <th rowspan="2" style="width:66px;">मूल<br>वेतन</th>
+            <th colspan="3" style="border-bottom:1px solid #555;">भत्ते</th>
+            <th rowspan="2" style="width:68px;">कुल<br>योग</th>
+            <th colspan="4" style="border-bottom:1px solid #555;">कटौती</th>
+            <th rowspan="2" style="width:68px;">शुद्ध<br>वेतन</th>
+          </tr>
+          <tr>
+            <th style="width:68px;" id="daH">महंगाई<br>भत्ता 58%</th>
+            <th style="width:66px;" id="hraH">मकान<br>भाड़ा 7%</th>
+            <th style="width:52px;">अन्य<br>भत्ता</th>
+            <th style="width:60px;">GPF</th>
+            <th style="width:46px;">GIS</th>
+            <th style="width:54px;">IT</th>
+            <th style="width:64px;">कुल<br>कटौती</th>
+          </tr>
+        </thead>
+        <tbody id="sTbody"></tbody>
+      </table>
+      </div>
+
+      <div class="sig-wrap"><div class="sig">
+        <span class="sig-title">हस्ताक्षर प्राचार्य</span>
+        <span class="sig-sub">शा.हा.स्कूल, मोढ़े</span>
+        <span class="sig-sub">वि.ख. तखतपुर, जि. बिलासपुर (छ. ग.)।</span>
+      </div></div>
+
+    </div><!-- /tableArea -->
+  </div><!-- /printArea -->
+</div>
+
+<script>
+// ── Data ──
+let SD = [
+  { nm:"प्रबिला टोप्पो",   cd:"05200780007", pt:"प्राचार्य",  dt:"01/07/25", bsc:98800, an:600, gpf:12000, gis:360, it:5000 },
+  { nm:"ज्ञान प्रकाश दर्शन", cd:"07200210059", pt:"व्याख्याता", dt:"01/07/25", bsc:54200, an:600, gpf:6504,  gis:360, it:0 },
+  { nm:"महेन्द्र कुमार दुबे",  cd:"07200860057", pt:"व्याख्याता", dt:"01/07/25", bsc:51100, an:600, gpf:6132,  gis:360, it:0 },
+  { nm:"विकास कुमार सोनवानी", cd:"07200860071", pt:"व्याख्याता", dt:"01/07/25", bsc:46800, an:600, gpf:5616,  gis:360, it:0 },
+  { nm:"प्रेरणा तिवारी",    cd:"07200860079", pt:"व्याख्याता", dt:"01/07/25", bsc:45400, an:600, gpf:5448,  gis:360, it:0 },
+  { nm:"तनवीर बानो खान",   cd:"07200860089", pt:"व्याख्याता", dt:"01/07/25", bsc:44100, an:600, gpf:5292,  gis:360, it:0 },
+];
+
+const POSTS = ['प्राचार्य','व्याख्याता','सहायक शिक्षक','अनुदेशक','भृत्य'];
+
+// ── Tabs ──
+function ST(t) {
+  ['s','k','p'].forEach((id,i)=>{
+    document.getElementById('panel-'+id).classList.toggle('active', id===t);
+    document.querySelectorAll('.tab-btn')[i].classList.toggle('active', id===t);
+  });
+}
+
+// ── Format ──
+function F(n) { return n ? Number(n).toLocaleString('en-IN') : '–'; }
+
+// ── Staff field update ──
+function sf(i,f,v) { SD[i][f]=v; RS(); }
+function AS() {
+  SD.push({ nm:"", cd:"", pt:"व्याख्याता", dt:"01/07/25", bsc:0, an:600, gpf:0, gis:360, it:0 });
+  RS();
+  setTimeout(()=>document.getElementById('staffList').lastElementChild?.scrollIntoView({behavior:'smooth'}),80);
+}
+function RM(i) { SD.splice(i,1); RS(); }
+
+// ── Render Staff Cards ──
+function RS() {
+  const da  = parseFloat(document.getElementById('daRate').value)||58;
+  const hra = parseFloat(document.getElementById('hraRate').value)||7;
+  document.getElementById('staffList').innerHTML = SD.map((s,i)=>{
+    const daA  = Math.round(s.bsc*da/100);
+    const hraA = Math.round(s.bsc*hra/100);
+    const gross= s.bsc+daA+hraA+(s.an||0);
+    const ded  = (s.gpf||0)+(s.gis||0)+(s.it||0);
+    return `<div class="sc">
+      <div class="sc-h">
+        <span>${i+1}. ${s.nm||'नया कर्मचारी'}</span>
+        <button onclick="RM(${i})">✕ हटाएं</button>
+      </div>
+      <div class="sc-b">
+        <div class="fr"><label>नाम</label>
+          <input value="${s.nm}" oninput="sf(${i},'nm',this.value)"></div>
+        <div class="g2">
+          <div class="fr"><label>Treasury Code</label>
+            <input value="${s.cd}" oninput="sf(${i},'cd',this.value)"></div>
+          <div class="fr"><label>पदनाम</label>
+            <select onchange="sf(${i},'pt',this.value)">
+              ${POSTS.map(p=>`<option ${s.pt===p?'selected':''}>${p}</option>`).join('')}
+            </select></div>
+        </div>
+        <div class="g2">
+          <div class="fr"><label>मूल वेतन ₹</label>
+            <input type="number" value="${s.bsc}" oninput="sf(${i},'bsc',parseInt(this.value)||0)"></div>
+          <div class="fr"><label>वेतन वृद्धि तिथि</label>
+            <input value="${s.dt}" oninput="sf(${i},'dt',this.value)"></div>
+        </div>
+        <div class="g2">
+          <div class="fr"><label>अन्य भत्ता ₹</label>
+            <input type="number" value="${s.an||0}" oninput="sf(${i},'an',parseInt(this.value)||0)"></div>
+          <div class="fr"><label>GPF ₹</label>
+            <input type="number" value="${s.gpf||0}" oninput="sf(${i},'gpf',parseInt(this.value)||0)"></div>
+        </div>
+        <div class="g2">
+          <div class="fr"><label>GIS ₹</label>
+            <input type="number" value="${s.gis||0}" oninput="sf(${i},'gis',parseInt(this.value)||0)"></div>
+          <div class="fr"><label>IT (आयकर) ₹</label>
+            <input type="number" value="${s.it||0}" oninput="sf(${i},'it',parseInt(this.value)||0)"></div>
+        </div>
+        <div class="preview">
+          DA(${da}%): <b>₹${F(daA)}</b> &nbsp;|&nbsp; HRA(${hra}%): <b>₹${F(hraA)}</b><br>
+          सकल: <b>₹${F(gross)}</b> &nbsp;|&nbsp; कटौती: <b>₹${F(ded)}</b><br>
+          <b>✅ शुद्ध वेतन: ₹${F(gross-ded)}</b>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Generate Table ──
+function GT() {
+  const da  = parseFloat(document.getElementById('daRate').value)||58;
+  const hra = parseFloat(document.getElementById('hraRate').value)||7;
+  const mon = document.getElementById('selMonth').value;
+  const yr  = document.getElementById('selYear').value;
+
+  document.getElementById('oMonth').textContent = mon + ',';
+  document.getElementById('oYear').textContent  = yr;
+  document.getElementById('daH').innerHTML  = `महंगाई<br>भत्ता ${da}%`;
+  document.getElementById('hraH').innerHTML = `मकान<br>भाड़ा ${hra}%`;
+
+  if (!SD.length) {
+    document.getElementById('emptyMsg').style.display='block';
+    document.getElementById('tableArea').style.display='none';
+    document.getElementById('sumGrid').style.display='none';
+    return;
+  }
+
+  const calc = s => {
+    const daA=Math.round(s.bsc*da/100), hraA=Math.round(s.bsc*hra/100);
+    const gross=s.bsc+daA+hraA+(s.an||0), ded=(s.gpf||0)+(s.gis||0)+(s.it||0);
+    return {...s, daA, hraA, gross, ded, net:gross-ded};
+  };
+
+  const sumAll = (rows, lb) => rows.reduce((a,r)=>({
+    bsc:a.bsc+r.bsc, daA:a.daA+r.daA, hraA:a.hraA+r.hraA, an:a.an+(r.an||0),
+    gross:a.gross+r.gross, gpf:a.gpf+(r.gpf||0), gis:a.gis+(r.gis||0), it:a.it+(r.it||0),
+    ded:a.ded+r.ded, net:a.net+r.net, lb
+  }), {bsc:0,daA:0,hraA:0,an:0,gross:0,gpf:0,gis:0,it:0,ded:0,net:0,lb});
+
+  // Data row
+  const DR = (r,n) => `<tr>
+    <td>${n}</td>
+    <td class="nc">${r.nm}<br><span class="code">${r.cd}</span></td>
+    <td>${r.pt}</td><td>${r.dt}</td><td>${F(r.bsc)}</td>
+    <td>${F(r.daA)}</td><td>${F(r.hraA)}</td><td>${r.an?F(r.an):'–'}</td>
+    <td>${F(r.gross)}</td>
+    <td>${r.gpf?F(r.gpf):'–'}</td><td>${r.gis?F(r.gis):'–'}</td><td>${r.it?F(r.it):'–'}</td>
+    <td>${F(r.ded)}</td><td><strong>${F(r.net)}</strong></td></tr>`;
+
+  // Subtotal/grand row
+  const SR = (t, cls) => `<tr class="${cls}">
+    <td colspan="3" style="text-align:center;">${t.lb}</td><td>–</td>
+    <td>${F(t.bsc)}</td><td>${F(t.daA)}</td><td>${F(t.hraA)}</td><td>${t.an?F(t.an):'–'}</td>
+    <td>${F(t.gross)}</td>
+    <td>${t.gpf?F(t.gpf):'–'}</td><td>${t.gis?F(t.gis):'–'}</td><td>${t.it?F(t.it):'–'}</td>
+    <td>${F(t.ded)}</td><td>${F(t.net)}</td></tr>`;
+
+  // Grand total — no dash in date column
+  const GR = t => `<tr class="gtot">
+    <td colspan="3" style="text-align:center;">${t.lb}</td><td></td>
+    <td>${F(t.bsc)}</td><td>${F(t.daA)}</td><td>${F(t.hraA)}</td><td>${t.an?F(t.an):'–'}</td>
+    <td>${F(t.gross)}</td>
+    <td>${t.gpf?F(t.gpf):'–'}</td><td>${t.gis?F(t.gis):'–'}</td><td>${t.it?F(t.it):'–'}</td>
+    <td>${F(t.ded)}</td><td>${F(t.net)}</td></tr>`;
+
+  let html='', n=0, all=[];
+
+  [
+    { f: s=>s.pt==='प्राचार्य',  lb:'प्राचार्य कुल योग' },
+    { f: s=>s.pt==='व्याख्याता', lb:'व्याख्याता कुल योग' },
+    { f: s=>s.pt!=='प्राचार्य'&&s.pt!=='व्याख्याता', lb:'अन्य कर्मचारी योग' },
+  ].forEach(g => {
+    const grp = SD.filter(g.f).map(calc);
+    if (!grp.length) return;
+    const s0 = n+1;
+    grp.forEach(r=>{ n++; all.push(r); html+=DR(r,n); });
+    const lbl = grp.length>1 ? g.lb+` (${s0} से ${n})` : g.lb;
+    html += SR(sumAll(grp, lbl), 'sub');
+  });
+
+  const gt = sumAll(all, `महायोग (1 से ${n})`);
+  html += GR(gt);
+
+  document.getElementById('sTbody').innerHTML = html;
+  document.getElementById('emptyMsg').style.display='none';
+  document.getElementById('tableArea').style.display='block';
+
+  // Summary cards
+  const sg = document.getElementById('sumGrid');
+  sg.style.display='grid';
+  sg.innerHTML=`
+    <div class="sc2"><div class="v">${n}</div><div class="l">कर्मचारी</div></div>
+    <div class="sc2"><div class="v">₹${F(gt.bsc)}</div><div class="l">कुल मूल वेतन</div></div>
+    <div class="sc2"><div class="v">₹${F(gt.daA)}</div><div class="l">महंगाई भत्ता ${da}%</div></div>
+    <div class="sc2"><div class="v">₹${F(gt.hraA)}</div><div class="l">मकान भाड़ा ${hra}%</div></div>
+    <div class="sc2"><div class="v">₹${F(gt.gross)}</div><div class="l">सकल वेतन</div></div>
+    <div class="sc2"><div class="v">₹${F(gt.ded)}</div><div class="l">कुल कटौती</div></div>
+    <div class="sc2 hl" style="grid-column:span 2;"><div class="v">₹${F(gt.net)}</div><div class="l">✅ कुल शुद्ध वेतन</div></div>`;
+}
+
+// ── PDF Download ──
+function DL() {
+  GT();
+  const mon = document.getElementById('selMonth').value;
+  const yr  = document.getElementById('selYear').value;
+  const btn = document.querySelector('.b-pdf');
+  btn.textContent='⏳ बन रहा है...'; btn.disabled=true;
+
+  const ta = document.getElementById('tableArea');
+  const em = document.getElementById('emptyMsg');
+  const pa = document.getElementById('printArea');
+  const prevTA = ta.style.display;
+  const prevEM = em.style.display;
+  ta.style.display = 'block';
+  em.style.display = 'none';
+  pa.style.overflow = 'visible';
+
+  setTimeout(()=>{
+    html2pdf().set({
+      margin:[6,5,6,5],
+      filename:`वेतन_देयक_${mon}_${yr}.pdf`,
+      image:{type:'jpeg',quality:1.0},
+      html2canvas:{scale:2,useCORS:true,logging:false,allowTaint:true,scrollX:0,scrollY:0},
+      jsPDF:{unit:'mm',format:'a4',orientation:'landscape'},
+      pagebreak:{mode:'avoid-all'}
+    }).from(pa).save().then(()=>{
+      ta.style.display = prevTA;
+      em.style.display = prevEM;
+      pa.style.overflow = '';
+      btn.textContent='⬇ PDF डाउनलोड करें'; btn.disabled=false;
+    }).catch(()=>{
+      ta.style.display = prevTA;
+      em.style.display = prevEM;
+      pa.style.overflow = '';
+      btn.textContent='⬇ PDF डाउनलोड करें'; btn.disabled=false;
+    });
+  },800);
+}
+
+// ── Rate listeners ──
+document.getElementById('daRate').addEventListener('input', RS);
+document.getElementById('hraRate').addEventListener('input', RS);
+
+// ── Init ──
+RS();
+</script>
+</body>
+</html>
